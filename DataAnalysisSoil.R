@@ -56,8 +56,11 @@
 #16. Does rhizobia affect plant growth?
       # a) Total biomass
       # b) Above ground
-      # c) Below ground    
-
+      # c) Below ground   
+# 17. Does presence of other microbes effect plant growth?
+      # a) Total biomass
+      # b) Above ground
+      # c) Below ground
 
 # Library Packages
 library(ggplot2)
@@ -118,15 +121,119 @@ Soil <- mat[,3]
 MyContMat <- rbind("FlvsPt" = FlvsPt, "BufvsWSM" = BufvsWSM, "Soil" = Soil)
 # ---------------------------------------------
 Mod_GLHT <- glht(mod1, linfct = mcp(SingleFactor = MyContMat))
-summary(Mod_GLHT, test = Ftest())
+summary(Mod_GLHT, test = adjusted("fdr"))
 plot(print(confint(Mod_GLHT)))
 mat
 contrasts(TW_shoot$SingleFactor) = mat
-mod1 <- aov(log(Weight) ~ SingleFactor, data = TW_shoot)
-summary.aov(mod1, split = list(SingleFactor = list("Fl vs Pt" = 1, "Buffer vs WSM" = 2, "Soil vs None" = 3)), type = "marginal")
-p.adjust(c(5.19e-08, 0.00253,1.50e-08,2.86e-05), "bonferroni")
+TW_shoot$Weight2 <- log(TW_shoot$Weight)
+mod1 <- aov(Weight2 ~ SingleFactor, data = TW_shoot)
+summary(mod1, split = list(SingleFactor = list("Fl vs Pt" = 1, "Buffer vs WSM" = 2, "Soil vs None" = 3)), type = "III")
 
+#----------
 ckTb <- table(TW_shoot$SingleFactor)
+MjK <-tapply(TW_shoot$Weight2, TW_shoot$SingleFactor, mean)
 dfmy <- sum(ckTb)-14
+SSE <- sum((TW_shoot$Weight2 - ave(TW_shoot$Weight2, TW_shoot$SingleFactor, FUN=mean))^2)
+MSE     <- SSE / dfmy
+(psiHat <- sum(MyContMat[1, ] * MjK))
+lenSq <- sum(MyContMat[1, ]^2 / ckTb) 
+(SE   <- sqrt(lenSq*MSE))
+(tStat <- psiHat / SE)
+(pVal <- 2 * (1-pt(abs(tStat), dfmy)))
 
-# This answers Questions 15b (No sig difference); 16a
+Gen.Means <- summarise(group_by(TW_shoot, Inoculate), y.mean = mean(log(Weight)))
+
+# This answers Questions 15b (No sig difference); 16b (Differs); 17b (differs)
+
+TWS_2 <- ddply(TW_shoot, "Genotype", summarise, MEAN = mean(Weight), se = sqrt(var(Weight) / length(Weight)))
+ggplot(TW_shoot, aes(x = Genotype, y = Weight)) + geom_boxplot() + labs(y = "Average shoot weight")+ theme(axis.text.x = element_text(size = 14))
+ggsave(file = "ShootGenotypeContrast8Feb2017.pdf")
+
+ggplot(TWS_2, aes(x = Genotype, y = MEAN))+ geom_bar(stat = "identity")+ geom_errorbar(aes(ymin = MEAN -se, ymax = MEAN + se), width = 0.5)
+
+
+ggplot(TW_shoot, aes(x = Inoculate, y = Weight)) + geom_boxplot() + labs(y = "Average shoot weight")+ theme(axis.text.x = element_text(size = 14))
+ggsave(file = "ShootInoculateContrast8Feb2017.pdf")
+
+# m1 <- aov(Weight2 ~ Genotype*Inoculate*SoilConc, data = TW_shoot)
+# m2 <- update(m1, ~. - Genotype:Inoculate:SoilLocation)
+# m3 <- update(m2, ~. - Genotype:SoilLocation)
+# m4 <- update(m3, ~. - Genotype:Inoculate)
+# Anova(m1, type = "3")
+# m1
+
+# Setting up post hoc contrast for affect of soil
+PostHocSoil <- read.csv("PostHocSoil.csv", header = F)
+NoneVsLow <- PostHocSoil$V1
+LowVsHigh <- PostHocSoil$V2
+NoneVsHigh <- PostHocSoil$V3
+mat.temp <- rbind(constant = 1/14, NoneVsLow, LowVsHigh, NoneVsHigh)
+mat <- ginv(mat.temp)
+mat <- mat[,-1]
+NoneVsLow <- mat[,1]
+LowVsHigh <- mat[,2]
+NoneVsHigh <- mat[,3]
+ContMatSoilC <- rbind("NoneVsLow" = NoneVsLow, "LowVsHigh" = LowVsHigh, "NoneVsHigh" = NoneVsHigh)
+
+mod1 <- aov(Weight2 ~ SingleFactor, data = TW_shoot)
+Mod_GLHT_Soil <- glht(mod1, linfct = mcp(SingleFactor = ContMatSoilC))
+summary(Mod_GLHT_Soil,  test = adjusted("fdr"))
+
+plot(print(confint(Mod_GLHT_Soil)))
+
+SC <- ddply(TW_shoot, "SoilConc", summarise, MEAN = mean(Weight), se = sqrt(var(Weight) / length(Weight)))
+ggplot(SC, aes(SoilConc, MEAN)) + geom_bar(stat = "identity")+ geom_errorbar(aes(ymin = MEAN -se, ymax = MEAN + se), width = 0.5)
+ggsave(file = "SoilConc10Feb1017.pdf")
+
+
+# Setting up posthoc contrast for soil location
+PostHocLoc <- read.csv("PostHocSoilLoc.csv", header = F)
+FlvsPT <- PostHocLoc$V1
+MatchNoMatch <- PostHocLoc$V2
+mat.temp <- rbind(constant = 1/14, FlvsPT, MatchNoMatch)
+mat <- ginv(mat.temp)
+mat <- mat[,-1]
+FlvsPT <- mat[,1]
+MatchNoMatch <- mat[,2]
+
+ContMatSoilLoc <- rbind("FlvsPT" = FlvsPT, "MatchNoMatch" = MatchNoMatch)
+mod1 <- aov(Weight2 ~ SingleFactor, data = TW_shoot)
+Mod_GLHT_Soil_Loc <- glht(mod1, linfct = mcp(SingleFactor = ContMatSoilLoc))
+summary(Mod_GLHT_Soil_Loc, test = adjusted("fdr"))
+
+ SL <- ddply(TW_shoot, c("Genotype", "SoilLocation"), summarise, MEAN = mean(Weight), se = sqrt(var(Weight) / length(Weight)))
+ SL <- subset(SL, SoilLocation != "none")
+ 
+ggplot(SL, aes(SoilLocation, MEAN)) + geom_bar(stat = "identity")+ geom_errorbar(aes(ymin = MEAN -se, ymax = MEAN + se), width = 0.5) + facet_wrap(~Genotype)
+ggsave(file = "SoilLocation11Feb2017.pdf")
+
+# Setting up post hoc contrasts for interactions
+
+IC <- read.csv("InteractionContrast.csv", header = F)
+Fl_SoilLoc <- IC$V1
+Fl_soil_ctrl <- IC$V2
+PI_SoilLoc <- IC$V3
+PI_soil_ctrl <- IC$V4
+RhizY_St.Aug_PI <-IC$V5
+RhizN_St.Aug_PI <-IC$V6
+Rhiz_St.Aug_FL_PT <-IC$V7
+Rhiz_PI_FL_PT <-IC$V8
+
+mat.temp <- rbind(constant = 1/14, Fl_SoilLoc, Fl_soil_ctrl, PI_SoilLoc, PI_soil_ctrl, RhizY_St.Aug_PI, RhizN_St.Aug_PI, Rhiz_St.Aug_FL_PT, Rhiz_PI_FL_PT)
+mat <- ginv(mat.temp)
+mat <- mat[,-1]
+
+Fl_SoilLoc <- mat[,1]
+Fl_soil_ctrl <- mat[,2]
+PI_SoilLoc <- mat[,3]
+PI_soil_ctrl <- mat[,4]
+RhizY_St.Aug_PI <-mat[,5]
+RhizN_St.Aug_PI <-mat[,6]
+Rhiz_St.Aug_FL_PT <-mat[,7]
+Rhiz_PI_FL_PT <-mat[,8]
+
+InteractionContrast <- rbind("Fl=SoilLoc" = Fl_SoilLoc, "Fl:soil=ctrl" = Fl_soil_ctrl, "Pt=SoilLoc" = PI_SoilLoc, "Pt:soil=ctrl" = PI_soil_ctrl, "RhizY::St.Aug=PI" = RhizY_St.Aug_PI, "RhizN::St.Aug=PI" = RhizN_St.Aug_PI, "Rhiz:StAug:Fl=PT" = Rhiz_St.Aug_FL_PT, "Rhiz:PI:Fl=PT" = Rhiz_PI_FL_PT)
+
+mod1 <- aov(Weight2 ~ SingleFactor, data = TW_shoot)
+Mod_GLHT_Inter <- glht(mod1, linfct = mcp(SingleFactor = InteractionContrast))
+summary(Mod_GLHT_Inter, test = Ftest())
