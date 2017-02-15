@@ -236,4 +236,119 @@ InteractionContrast <- rbind("Fl=SoilLoc" = Fl_SoilLoc, "Fl:soil=ctrl" = Fl_soil
 
 mod1 <- aov(Weight2 ~ SingleFactor, data = TW_shoot)
 Mod_GLHT_Inter <- glht(mod1, linfct = mcp(SingleFactor = InteractionContrast))
-summary(Mod_GLHT_Inter, test = Ftest())
+summary(Mod_GLHT_Inter, test = adjusted("fdr"))
+
+
+ggplot(TW_shoot, aes(x = Inoculate, y = Weight, colour = SoilConc)) + stat_summary(fun.data = "mean_se", na.rm = T) + facet_wrap(~ SoilLocation)
+
+
+
+# ----------------------------
+# Answering Maren's questions Feb 14, 2017
+
+IC <- read.csv("InteractionContrast.csv", header = F)
+Fl_SoilLoc <- IC$V1
+Fl_soil_ctrl <- IC$V2
+PI_SoilLoc <- IC$V3
+PI_soil_ctrl <- IC$V4
+RhizY_St.Aug_PI <-IC$V5
+RhizN_St.Aug_PI <-IC$V6
+Rhiz_St.Aug_FL_PT <-IC$V7
+Rhiz_PI_FL_PT <-IC$V8
+RSLH <- IC$V9
+RSLN <- IC$V10
+RSNH <- IC$V11
+RSSPall <- IC$V12
+RSSPlow <- IC$V13
+
+mat.temp <- rbind(constant = 1/14, Fl_SoilLoc, Fl_soil_ctrl, PI_SoilLoc, PI_soil_ctrl, RhizY_St.Aug_PI, RhizN_St.Aug_PI, Rhiz_St.Aug_FL_PT, Rhiz_PI_FL_PT, RSLH, RSLN, RSNH, RSSPall, RSSPlow)
+mat <- ginv(mat.temp)
+mat <- mat[,-1]
+
+Fl_SoilLoc <- mat[,1]
+Fl_soil_ctrl <- mat[,2]
+PI_SoilLoc <- mat[,3]
+PI_soil_ctrl <- mat[,4]
+RhizY_St.Aug_PI <-mat[,5]
+RhizN_St.Aug_PI <-mat[,6]
+Rhiz_St.Aug_FL_PT <-mat[,7]
+Rhiz_PI_FL_PT <-mat[,8]
+RSLH <- mat[,9]
+RSLN <- mat[,10]
+RSNH <- mat[,11]
+RSSPall <- mat[,12]
+RSSPlow <- mat[,13]
+
+InteractionContrast <- rbind("Fl=SoilLoc" = Fl_SoilLoc, "Fl:soil=ctrl" = Fl_soil_ctrl, "Pt=SoilLoc" = PI_SoilLoc, "Pt:soil=ctrl" = PI_soil_ctrl, "RhizY::St.Aug=PI" = RhizY_St.Aug_PI, "RhizN::St.Aug=PI" = RhizN_St.Aug_PI, "Rhiz:StAug:Fl=PT" = Rhiz_St.Aug_FL_PT, "Rhiz:PI:Fl=PT" = Rhiz_PI_FL_PT, "RSLH" = RSLH, "RSLN" = RSLN, "RSNH" = RSNH, "RSSPall" = RSSPall, "RSSPlow" = RSSPlow)
+
+mod1 <- aov(Weight2 ~ SingleFactor, data = TW_shoot)
+Mod_GLHT_Inter <- glht(mod1, linfct = mcp(SingleFactor = InteractionContrast))
+summary(Mod_GLHT_Inter, test = adjusted("none"))
+
+#-----------
+Rhiz_SoilAll <- read.csv("NewTrtLvls_SoilComb.csv")
+Rhiz_SoilAll$Gen_Trt <- interaction(Rhiz_SoilAll$Genotype, Rhiz_SoilAll$Treatment)
+Rhiz_SoilAll$LogWeight <- log(Rhiz_SoilAll$Weight)
+levels(Rhiz_SoilAll$Gen_Trt)
+
+mod2 <- aov(LogWeight ~ Gen_Trt, data = Rhiz_SoilAll)
+summary(glht(mod2, linfct = mcp(Gen_Trt = "Tukey")), test = adjusted(type ="holm"))
+Mod2_cld <- cld(glht(mod2, linfct = mcp(Gen_Trt = "Tukey")))
+old.par <- par(mai=c(1,1,1.5,1), no.readonly = TRUE)
+plot(Mod2_cld)
+
+# contrasts(Rhiz_SoilAll$Genotype) <- contr.sum
+# contrasts(Rhiz_SoilAll$Treatment) <- contr.sum
+# mod3 <- lm(LogWeight ~ Genotype * Treatment, data = Rhiz_SoilAll)
+# Anova(mod3, type = "3")
+# summary.aov(mod3)
+
+RhizLow <- read.csv("NewTrtLvls_LowSoil.csv")
+RhizLow$Gen_Trt <- interaction(RhizLow$Genotype, RhizLow$Treatment)
+RhizLow$LogWeight <- log(RhizLow$Weight)
+levels(RhizLow$Gen_Trt)
+
+mod4 <- aov(LogWeight ~ Gen_Trt, data = RhizLow)
+summary(glht(mod4, linfct = mcp(Gen_Trt = "Tukey")), test = adjusted("fdr"))
+Mod4_cld <- cld(glht(mod4, linfct = mcp(Gen_Trt = "Tukey")))
+plot(Mod4_cld)
+
+
+
+RSLH <- IC$V9
+RSLN <- IC$V10
+RSNH <- IC$V11
+RSSPall <- IC$V12
+RSSPlow <- IC$V13
+
+mat.temp <- rbind(constant = 1/14, RSLH, RSLN, RSNH, RSSPall, RSSPlow)
+mat <- ginv(mat.temp)
+mat <- mat[,-1]
+
+RSLH <- mat[,1]
+RSLN <- mat[,2]
+RSNH <- mat[,3]
+RSSPall <- mat[,4]
+RSSPlow <- mat[,5]
+
+InteractionContrast <- rbind("RSLH" = RSLH, "RSLN" = RSLN, "RSNH" = RSNH, "RSSPall" = RSSPall, "RSSPlow" = RSSPlow)
+
+mod1 <- aov(Weight2 ~ SingleFactor, data = TW_shoot)
+Mod_GLHT_Inter <- glht(mod1, linfct = mcp(SingleFactor = InteractionContrast))
+summary(Mod_GLHT_Inter, test = adjusted("none"))
+
+#------------End of ShootData------------------------------
+#-----------Start of Root Data-------------------------------
+TW <- read.csv("TissueWeight.csv")
+TW_root <- subset(TW, TissueType == "Root")
+hist(log(Weight) ~ Genotype * Inoculate * SoilConc * SoilLocation, TW_root)
+TW_root$logWeight <- log(TW_root$Weight)
+replications(log(Weight) ~ Genotype * Inoculate * SoilConc * SoilLocation, TW_root)
+qqnorm(TW_root$logWeight)
+qqline(TW_root$logWeight)
+hist(TW_root$logWeight)
+# Has some normality issues; putting on hold for the moment
+#------------End of RootData------------------------------
+
+#-----------Start of Mortality Data-------------------------------
+
